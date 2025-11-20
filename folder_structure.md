@@ -80,7 +80,9 @@ zero-error-system/
 │   │   │   ├── property_tester.py     # Property-based testing
 │   │   │   ├── static_analyzer.py     # Static analysis
 │   │   │   ├── security_scanner.py    # Security scanning
-│   │   │   └── performance_checker.py # Performance validation
+│   │   │   ├── performance_checker.py # Performance validation
+│   │   │   ├── formal_prover.py       # Formal verification engine
+│   │   │   └── compositional_verifier.py # Compositional verification
 │   │   │
 │   │   └── 📁 red_flag/                # Red-flag detection
 │   │       ├── __init__.py
@@ -88,6 +90,12 @@ zero-error-system/
 │   │       ├── patterns.py            # Detection patterns
 │   │       ├── uncertainty.py         # Uncertainty detection
 │   │       └── escalation.py          # Escalation logic
+│   │
+│   │   ├── 📁 learning/                # Continuous learning
+│   │   │   ├── __init__.py
+│   │   │   ├── pattern_recognizer.py  # Error pattern recognition
+│   │   │   ├── agent_improver.py      # Agent specialization
+│   │   │   └── spec_refiner.py        # Specification refinement
 │   │
 │   ├── 📁 agents/                      # Agent system
 │   │   ├── 📁 archetypes/              # Agent archetypes
