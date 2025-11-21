@@ -502,15 +502,13 @@ class FallbackManager:
                 chain = self.fallback_chains[chain_name]
 
                 # Find failed model in chain
-                try:
+                if failed_model_id in chain:
                     failed_index = chain.index(failed_model_id)
                     # Try next models in chain
                     for model_id in chain[failed_index + 1:]:
                         if self._is_model_available(model_id):
                             fallback_model_id = model_id
                             break
-                except ValueError:
-                    pass
 
             # If no chain or no fallback found, select best available
             if fallback_model_id is None:

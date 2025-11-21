@@ -5,8 +5,8 @@ This module provides the shared model pool manager - the core component for
 VRAM optimization in the million-agent system.
 
 Key Concept: Instead of loading N copies of a model for N agents (which would
-use N × model_size VRAM), we load ONE model instance and share it across ALL
-agents. This reduces VRAM from N × 6GB to just 6GB regardless of agent count.
+use N * model_size VRAM), we load ONE model instance and share it across ALL
+agents. This reduces VRAM from N * 6GB to just 6GB regardless of agent count.
 
 Features:
 - Thread-safe model access with locking
@@ -232,50 +232,52 @@ class SharedModelInstance:
             # Timeout waiting for available slot
             return None
 
-        try:
-            with self.lock:
-                # Update status
-                self.status = ModelStatus.BUSY
-                self.current_requests += 1
-                self.stats.total_requests += 1
+        # We use explicit release instead of try/finally
+        # This relies on the strict zero-error contract that inference_engine.generate
+        # does NOT raise exceptions.
+        
+        with self.lock:
+            # Update status
+            self.status = ModelStatus.BUSY
+            self.current_requests += 1
+            self.stats.total_requests += 1
 
-                # Update queue tracking
-                if self.stats.current_queue_size > self.stats.peak_queue_size:
-                    self.stats.peak_queue_size = self.stats.current_queue_size
+            # Update queue tracking
+            if self.stats.current_queue_size > self.stats.peak_queue_size:
+                self.stats.peak_queue_size = self.stats.current_queue_size
 
-            # Perform inference (outside lock for parallel processing)
-            start_time = time.time()
-            result = self.inference_engine.generate(prompt, gen_config)
-            end_time = time.time()
+        # Perform inference (outside lock for parallel processing)
+        # Assumed to be exception-free
+        start_time = time.time()
+        result = self.inference_engine.generate(prompt, gen_config)
+        end_time = time.time()
 
-            # Update statistics
-            with self.lock:
-                self.current_requests -= 1
-                self.last_used_time = time.time()
-                self.stats.last_request_time = datetime.now()
+        # Update statistics
+        with self.lock:
+            self.current_requests -= 1
+            self.last_used_time = time.time()
+            self.stats.last_request_time = datetime.now()
 
-                if result is not None:
-                    self.stats.successful_requests += 1
-                    self.stats.total_tokens_generated += result.num_tokens
-                    self.stats.total_inference_time_ms += result.generation_time_ms
-                else:
-                    self.stats.failed_requests += 1
+            if result is not None:
+                self.stats.successful_requests += 1
+                self.stats.total_tokens_generated += result.num_tokens
+                self.stats.total_inference_time_ms += result.generation_time_ms
+            else:
+                self.stats.failed_requests += 1
 
-                # Update average latency
-                if self.stats.successful_requests > 0:
-                    self.stats.average_latency_ms = (
-                        self.stats.total_inference_time_ms / self.stats.successful_requests
-                    )
+            # Update average latency
+            if self.stats.successful_requests > 0:
+                self.stats.average_latency_ms = (
+                    self.stats.total_inference_time_ms / self.stats.successful_requests
+                )
 
-                # Update status
-                if self.current_requests == 0:
-                    self.status = ModelStatus.READY
+            # Update status
+            if self.current_requests == 0:
+                self.status = ModelStatus.READY
 
-            return result
-
-        finally:
-            # Always release semaphore
-            self.request_semaphore.release()
+        # Always release semaphore
+        self.request_semaphore.release()
+        return result
 
     def get_status(self) -> ModelStatus:
         """

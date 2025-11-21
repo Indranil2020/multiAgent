@@ -312,68 +312,55 @@ class CUDAHandler:
         )
 
         # Attempt recovery based on strategy
-        try:
-            if strategy == RecoveryStrategy.CLEAR_CACHE:
-                success = self._clear_cuda_cache(device_id)
+        if strategy == RecoveryStrategy.CLEAR_CACHE:
+            success = self._clear_cuda_cache(device_id)
+            if success:
+                with self.lock:
+                    self.stats.cache_clears += 1
+
+        elif strategy == RecoveryStrategy.REDUCE_BATCH:
+            success = self._reduce_batch_size(context or {})
+
+        elif strategy == RecoveryStrategy.REDUCE_SEQUENCE:
+            success = self._reduce_sequence_length(context or {})
+
+        elif strategy == RecoveryStrategy.OFFLOAD_CPU:
+            success = self._offload_to_cpu(context or {})
+            if success:
+                with self.lock:
+                    self.stats.cpu_fallbacks += 1
+
+        elif strategy == RecoveryStrategy.RESET_DEVICE:
+            if self.config.enable_device_reset:
+                success = self._reset_device(device_id)
                 if success:
                     with self.lock:
-                        self.stats.cache_clears += 1
-
-            elif strategy == RecoveryStrategy.REDUCE_BATCH:
-                success = self._reduce_batch_size(context or {})
-
-            elif strategy == RecoveryStrategy.REDUCE_SEQUENCE:
-                success = self._reduce_sequence_length(context or {})
-
-            elif strategy == RecoveryStrategy.OFFLOAD_CPU:
-                success = self._offload_to_cpu(context or {})
-                if success:
-                    with self.lock:
-                        self.stats.cpu_fallbacks += 1
-
-            elif strategy == RecoveryStrategy.RESET_DEVICE:
-                if self.config.enable_device_reset:
-                    success = self._reset_device(device_id)
-                    if success:
-                        with self.lock:
-                            self.stats.device_resets += 1
-                else:
-                    success = False
-
-            elif strategy == RecoveryStrategy.RESTART_WORKER:
-                # Would trigger worker restart in production
-                success = False
-
+                        self.stats.device_resets += 1
             else:
                 success = False
 
-            # Update attempt record
-            attempt.success = success
+        elif strategy == RecoveryStrategy.RESTART_WORKER:
+            # Would trigger worker restart in production
+            success = False
 
-            # Record attempt
-            with self.lock:
-                self.recovery_history.append(attempt)
+        else:
+            success = False
 
-                if success:
-                    self.stats.recoverable_errors += 1
-                else:
-                    self.stats.unrecoverable_errors += 1
+        # Update attempt record
+        attempt.success = success
 
-                self.stats.update_success_rate()
+        # Record attempt
+        with self.lock:
+            self.recovery_history.append(attempt)
 
-            return success
-
-        except Exception as e:
-            # Recovery itself failed
-            attempt.success = False
-            attempt.details = f"Recovery failed: {str(e)}"
-
-            with self.lock:
-                self.recovery_history.append(attempt)
+            if success:
+                self.stats.recoverable_errors += 1
+            else:
                 self.stats.unrecoverable_errors += 1
-                self.stats.update_success_rate()
 
-            return False
+            self.stats.update_success_rate()
+
+        return success
 
     def _classify_error(
         self,
