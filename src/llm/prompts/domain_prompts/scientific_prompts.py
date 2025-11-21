@@ -26,7 +26,7 @@ All templates enforce zero-error principles with complete implementations.
 """
 
 from typing import Optional, List
-from llm.prompts.base_prompts import PromptTemplate
+from ..base_prompts import PromptTemplate
 
 
 NUMERICAL_COMPUTING_PROMPT = PromptTemplate(

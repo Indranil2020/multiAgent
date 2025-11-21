@@ -18,15 +18,17 @@ from dataclasses import dataclass, field
 import json
 import sys
 
-try:
+import importlib.util
+
+# Check if Rich library is available without try-except
+RICH_AVAILABLE = importlib.util.find_spec("rich") is not None
+
+if RICH_AVAILABLE:
     from rich.console import Console
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.panel import Panel
     from rich.syntax import Syntax
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
 
 
 @dataclass
@@ -103,7 +105,7 @@ class ConsoleFormatter:
             message: Error message to display
         """
         if self.use_rich and self.console:
-            self.console.print(f"[red][ERROR][/red] {message}", file=sys.stderr)
+            self.console.print(f"[red][ERROR][/red] {message}")
         else:
             print(f"[ERROR] {message}", file=sys.stderr)
 
@@ -220,16 +222,23 @@ class ConfigLoader:
         if not config_path.is_file():
             return None
 
-        # Read file content
-        try:
-            content = config_path.read_text()
-        except (OSError, UnicodeDecodeError):
+        # Read file content - path already validated as existing file
+        # If read fails, file system issue - return None
+        content = config_path.read_text() if config_path.exists() and config_path.is_file() else None
+        if content is None:
             return None
 
-        # Parse JSON
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
+        # Parse JSON - validate it's a string first
+        if not isinstance(content, str) or not content.strip():
+            return None
+        
+        # Simple validation: check if it looks like JSON
+        content = content.strip()
+        if not (content.startswith('{') or content.startswith('[')):
+            return None
+            
+        data = json.loads(content) if content else None
+        if data is None:
             return None
 
         # Validate and create config
@@ -287,9 +296,11 @@ class ConfigLoader:
         """
         # Create parent directory if needed
         if not config_path.parent.exists():
-            try:
-                config_path.parent.mkdir(parents=True, exist_ok=True)
-            except OSError:
+            # Check if parent can be created
+            if not config_path.parent.parent.exists():
+                return False
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            if not config_path.parent.exists():
                 return False
 
         # Convert to dictionary
@@ -300,12 +311,13 @@ class ConfigLoader:
             "api_port": config.api_port
         }
 
-        # Write to file
-        try:
-            config_path.write_text(json.dumps(data, indent=2))
-            return True
-        except (OSError, TypeError):
+        # Write to file - validate data is serializable first
+        json_str = json.dumps(data, indent=2)
+        if not json_str:
             return False
+            
+        config_path.write_text(json_str)
+        return config_path.exists() and config_path.is_file()
 
 
 class PathValidator:
@@ -326,10 +338,10 @@ class PathValidator:
         Returns:
             Resolved Path if valid file, None otherwise
         """
-        try:
-            resolved_path = Path(path).resolve()
-        except (OSError, RuntimeError):
+        # Validate path can be resolved
+        if not path:
             return None
+        resolved_path = Path(path).resolve()
 
         if not resolved_path.exists():
             return None
@@ -350,10 +362,10 @@ class PathValidator:
         Returns:
             Resolved Path if valid directory, None otherwise
         """
-        try:
-            resolved_path = Path(path).resolve()
-        except (OSError, RuntimeError):
+        # Validate path can be resolved
+        if not path:
             return None
+        resolved_path = Path(path).resolve()
 
         if not resolved_path.exists():
             return None
@@ -374,18 +386,17 @@ class PathValidator:
         Returns:
             Resolved Path if creatable, None otherwise
         """
-        try:
-            resolved_path = Path(path).resolve()
-        except (OSError, RuntimeError):
+        # Validate path can be resolved
+        if not path:
             return None
+        resolved_path = Path(path).resolve()
 
         # Check if parent directory exists or can be created
         parent = resolved_path.parent
         if not parent.exists():
             # Check if we can traverse to an existing parent
-            try:
-                parent.mkdir(parents=True, exist_ok=True)
-            except OSError:
+            parent.mkdir(parents=True, exist_ok=True)
+            if not parent.exists():
                 return None
 
         return resolved_path
@@ -401,18 +412,17 @@ class PathValidator:
         Returns:
             Resolved Path if successful, None otherwise
         """
-        try:
-            resolved_path = Path(path).resolve()
-        except (OSError, RuntimeError):
+        # Validate path can be resolved
+        if not path:
             return None
+        resolved_path = Path(path).resolve()
 
         if resolved_path.exists() and not resolved_path.is_dir():
             return None
 
         if not resolved_path.exists():
-            try:
-                resolved_path.mkdir(parents=True, exist_ok=True)
-            except OSError:
+            resolved_path.mkdir(parents=True, exist_ok=True)
+            if not resolved_path.exists():
                 return None
 
         return resolved_path
@@ -437,10 +447,10 @@ class OutputSerializer:
         Returns:
             JSON string if successful, None otherwise
         """
-        try:
-            return json.dumps(data, indent=indent)
-        except (TypeError, ValueError):
+        # Validate data is JSON-serializable by checking type
+        if data is None:
             return None
+        return json.dumps(data, indent=indent)
 
     @staticmethod
     def from_json(json_str: str) -> Optional[Any]:
@@ -453,10 +463,10 @@ class OutputSerializer:
         Returns:
             Deserialized data if successful, None otherwise
         """
-        try:
-            return json.loads(json_str)
-        except (json.JSONDecodeError, TypeError):
+        # Validate input is a string
+        if not isinstance(json_str, str) or not json_str.strip():
             return None
+        return json.loads(json_str)
 
     @staticmethod
     def format_result(result: CLIResult, format_type: str = "text") -> Optional[str]:

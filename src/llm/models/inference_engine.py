@@ -20,6 +20,7 @@ from typing import Optional, List, Dict, Any, Iterator, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import time
+import ollama
 
 
 class SamplingStrategy(Enum):
@@ -248,7 +249,10 @@ class InferenceEngine:
         start_time = time.time()
 
         # Simulate generation (in production, would call actual model)
-        result = self._simulate_generation(prompt, gen_config)
+        if isinstance(self.model, dict) and self.model.get("backend") == "ollama":
+            result = self._generate_ollama(prompt, gen_config)
+        else:
+            result = self._simulate_generation(prompt, gen_config)
 
         end_time = time.time()
         generation_time_ms = (end_time - start_time) * 1000
@@ -402,6 +406,68 @@ class InferenceEngine:
         truncated_words = words[:int(len(words) * ratio)]
 
         return " ".join(truncated_words)
+
+    def _generate_ollama(
+        self,
+        prompt: str,
+        config: GenerationConfig
+    ) -> Optional[GenerationResult]:
+        """
+        Generate text using Ollama.
+
+        Args:
+            prompt: Input prompt
+            config: Generation configuration
+
+        Returns:
+            GenerationResult
+        """
+        # Map config to Ollama options
+        options = {
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "top_k": config.top_k,
+            "num_predict": config.max_new_tokens,
+            "stop": config.stop_sequences
+        }
+
+        # Get model name from config
+        model_name = "llama3" # Default
+        if isinstance(self.model, dict) and "name" in self.model:
+            model_name = self.model["name"]
+
+        # Call Ollama - validate response
+        response = ollama.generate(
+            model=model_name,
+            prompt=prompt,
+            options=options,
+            stream=False
+        )
+        
+        # Validate response structure
+        if not response or 'response' not in response:
+            print(f"Ollama generation failed: invalid response structure")
+            return None
+        
+        generated_text = response['response']
+        eval_count = response.get('eval_count', 0)
+        eval_duration = response.get('eval_duration', 0)
+        
+        # Calculate metrics
+        generation_time_ms = eval_duration / 1000000 # nanoseconds to ms
+        tokens_per_second = (eval_count / (generation_time_ms / 1000)) if generation_time_ms > 0 else 0.0
+        
+        return GenerationResult(
+            text=generated_text,
+            tokens=[], # Ollama doesn't return tokens easily without API
+            finish_reason="stop",
+            num_tokens=eval_count,
+            generation_time_ms=generation_time_ms,
+            tokens_per_second=tokens_per_second,
+            prompt_tokens=response.get('prompt_eval_count', 0),
+            total_tokens=eval_count + response.get('prompt_eval_count', 0),
+            metadata=response
+        )
 
     def _simulate_generation(
         self,

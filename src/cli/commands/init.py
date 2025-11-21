@@ -395,9 +395,17 @@ class InitCommand:
             **template.config
         }
 
-        try:
-            config_path.write_text(json.dumps(config_data, indent=2))
-        except (OSError, TypeError):
+        # Validate config data is serializable
+        json_str = json.dumps(config_data, indent=2)
+        if not json_str:
+            return CLIResult(
+                success=False,
+                message="Failed to serialize project configuration",
+                error_code=20
+            )
+        
+        config_path.write_text(json_str)
+        if not config_path.exists():
             return CLIResult(
                 success=False,
                 message="Failed to write project configuration",
@@ -412,9 +420,17 @@ class InitCommand:
             "fail_fast": False
         }
 
-        try:
-            verification_path.write_text(json.dumps(verification_data, indent=2))
-        except (OSError, TypeError):
+        # Validate verification data is serializable
+        json_str = json.dumps(verification_data, indent=2)
+        if not json_str:
+            return CLIResult(
+                success=False,
+                message="Failed to serialize verification configuration",
+                error_code=21
+            )
+        
+        verification_path.write_text(json_str)
+        if not verification_path.exists():
             return CLIResult(
                 success=False,
                 message="Failed to write verification configuration",
@@ -429,9 +445,17 @@ class InitCommand:
             "spawn_strategy": "on_demand"
         }
 
-        try:
-            agent_path.write_text(json.dumps(agent_data, indent=2))
-        except (OSError, TypeError):
+        # Validate agent data is serializable
+        json_str = json.dumps(agent_data, indent=2)
+        if not json_str:
+            return CLIResult(
+                success=False,
+                message="Failed to serialize agent configuration",
+                error_code=22
+            )
+        
+        agent_path.write_text(json_str)
+        if not agent_path.exists():
             return CLIResult(
                 success=False,
                 message="Failed to write agent configuration",
@@ -465,9 +489,17 @@ class InitCommand:
                     error_code=30
                 )
 
-        try:
-            example_path.write_text(json.dumps(EXAMPLE_TASK_SPEC, indent=2))
-        except (OSError, TypeError):
+        # Validate example data is serializable
+        json_str = json.dumps(EXAMPLE_TASK_SPEC, indent=2)
+        if not json_str:
+            return CLIResult(
+                success=False,
+                message="Failed to serialize example specification",
+                error_code=31
+            )
+        
+        example_path.write_text(json_str)
+        if not example_path.exists():
             return CLIResult(
                 success=False,
                 message="Failed to write example specification",
@@ -522,9 +554,16 @@ Edit configuration files in `config/`:
 For more information, see the zero-error system documentation.
 """
 
-        try:
-            readme_path.write_text(readme_content)
-        except OSError:
+        # Write README - validate directory exists
+        if not readme_path.parent.exists():
+            return CLIResult(
+                success=False,
+                message="Project directory does not exist",
+                error_code=40
+            )
+        
+        readme_path.write_text(readme_content)
+        if not readme_path.exists():
             return CLIResult(
                 success=False,
                 message="Failed to write README",

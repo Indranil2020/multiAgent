@@ -29,6 +29,13 @@ from ..utils import (
     create_default_formatter
 )
 
+from ...llm.models.model_pool import ModelPool, ModelPoolConfig, GenerationConfig
+from ...agents.swarm.coordinator import SwarmCoordinator, SwarmConfig
+from ...agents.archetypes.specification_agent import SpecificationAgent
+from ...core.task_spec.language import TaskSpecification as CoreTaskSpecification
+from ...core.task_spec.types import TaskID, TaskType
+from ...core.voting.types import AgentConfig
+
 
 @dataclass
 class RunOptions:
@@ -142,6 +149,34 @@ class RunCommand:
         """
         self.formatter = formatter or create_default_formatter()
 
+    class LLMPoolAdapter:
+        """Adapter to make ModelPool compatible with LLMPool protocol."""
+        
+        def __init__(self, model_pool: ModelPool):
+            self.model_pool = model_pool
+            
+        def generate(
+            self,
+            prompt: str,
+            model_name: str = "default",
+            temperature: float = 0.7,
+            max_tokens: int = 512,
+            stop_sequences: Optional[List[str]] = None
+        ) -> str:
+            # Create config
+            config = GenerationConfig(
+                max_new_tokens=max_tokens,
+                temperature=temperature,
+                stop_sequences=stop_sequences or []
+            )
+            
+            # Generate
+            result = self.model_pool.generate(prompt, config)
+            
+            if result:
+                return result.text
+            return ""
+
     def execute(self, options: RunOptions) -> CLIResult:
         """
         Execute run command.
@@ -152,25 +187,52 @@ class RunCommand:
         Returns:
             CLIResult with operation status
         """
-        # Validate spec file
-        spec_path = PathValidator.validate_file_path(options.spec_file)
-        if spec_path is None:
-            return CLIResult(
-                success=False,
-                message=f"Invalid spec file: {options.spec_file}",
-                error_code=1
-            )
+        # Check if input is natural language or JSON file
+        if not options.spec_file.exists():
+            # Might be natural language description
+            description = str(options.spec_file)
+            if not description.endswith('.json'):
+                # Treat as natural language
+                self.formatter.print_info("Detected natural language input...")
+                self.formatter.print_info("Generating formal task specification...")
+                
+                spec_result = self._generate_specification_from_description(
+                    description,
+                    options
+                )
+                if not spec_result.success:
+                    return spec_result
+                
+                task_spec = spec_result.data["specification"]
+            else:
+                return CLIResult(
+                    success=False,
+                    message=f"Spec file not found: {options.spec_file}",
+                    error_code=1
+                )
+        else:
+            # Validate spec file path
+            spec_path = PathValidator.validate_file_path(options.spec_file)
+            if spec_path is None:
+                return CLIResult(
+                    success=False,
+                    message=f"Invalid spec file: {options.spec_file}",
+                    error_code=1
+                )
 
-        # Load task specification
-        self.formatter.print_info("Loading task specification...")
-        spec_result = self._load_specification(spec_path)
-        if not spec_result.success:
-            return spec_result
+            # Load task specification from file
+            self.formatter.print_info("Loading task specification...")
+            spec_result = self._load_specification(spec_path)
+            if not spec_result.success:
+                return spec_result
 
-        task_spec = spec_result.data["specification"]
+            task_spec = spec_result.data["specification"]
 
-        # Determine output directory
-        output_dir = self._determine_output_dir(options.output_dir, spec_path)
+        # Determine output directory (use current dir for natural language input)
+        if 'spec_path' in locals():
+            output_dir = self._determine_output_dir(options.output_dir, spec_path)
+        else:
+            output_dir = self._determine_output_dir(options.output_dir, None)
         if output_dir is None:
             return CLIResult(
                 success=False,
@@ -233,25 +295,31 @@ class RunCommand:
         Returns:
             CLIResult with loaded specification
         """
-        # Read file
-        try:
-            spec_content = spec_path.read_text()
-        except (OSError, UnicodeDecodeError):
+        # Read file - validate path first
+        if not spec_path.exists() or not spec_path.is_file():
+            return CLIResult(
+                success=False,
+                message=f"Specification file does not exist or is not a file",
+                error_code=10
+            )
+        
+        spec_content = spec_path.read_text()
+        if not spec_content:
             return CLIResult(
                 success=False,
                 message=f"Failed to read specification file",
                 error_code=10
             )
 
-        # Parse JSON
-        try:
-            spec_data = json.loads(spec_content)
-        except json.JSONDecodeError as e:
+        # Parse JSON - validate it's valid JSON format first
+        if not spec_content.strip().startswith('{'):
             return CLIResult(
                 success=False,
-                message=f"Invalid JSON in specification: {e}",
+                message=f"Invalid JSON format in specification file",
                 error_code=11
             )
+        
+        spec_data = json.loads(spec_content)
 
         # Validate and create specification
         validation_result = self._validate_specification(spec_data)
@@ -274,6 +342,90 @@ class RunCommand:
         return CLIResult(
             success=True,
             message="Specification loaded",
+            data={"specification": task_spec}
+        )
+
+    def _generate_specification_from_description(
+        self,
+        description: str,
+        options: RunOptions
+    ) -> CLIResult:
+        """
+        Generate formal task specification from natural language description.
+
+        Args:
+            description: Natural language task description
+            options: Run options
+
+        Returns:
+            CLIResult with generated specification
+        """
+        # Initialize model pool for SpecificationAgent
+        pool_config = ModelPoolConfig(
+            model_name="ollama/codellama:7b-instruct-q4_K_M",
+            max_concurrent_requests=1,
+            warmup_on_start=False
+        )
+        
+        # Validate config
+        if not pool_config.validate():
+            return CLIResult(
+                success=False,
+                message="Invalid model pool configuration",
+                error_code=20
+            )
+        
+        model_pool = ModelPool(pool_config)
+        if model_pool is None:
+            return CLIResult(
+                success=False,
+                message="Failed to initialize model pool",
+                error_code=20
+            )
+        
+        llm_pool_adapter = self.LLMPoolAdapter(model_pool)
+        
+        # Create SpecificationAgent
+        spec_agent = SpecificationAgent()
+        
+        # Generate specification
+        self.formatter.print_info(f"Analyzing description: '{description[:100]}...'")
+        spec_dict = spec_agent.generate_specification_from_description(
+            description=description,
+            llm_pool=llm_pool_adapter,
+            additional_context=None
+        )
+        
+        if spec_dict is None:
+            return CLIResult(
+                success=False,
+                message="Failed to generate specification from description",
+                error_code=21
+            )
+        
+        self.formatter.print_success("Generated formal task specification!")
+        
+        # Display generated spec
+        if options.verbose:
+            self.formatter.print_info("Generated specification:")
+            self.formatter.print_json(spec_dict)
+        
+        # Create TaskSpecification object
+        task_spec = TaskSpecification(
+            task_id=spec_dict.get("task_id", "unknown"),
+            name=spec_dict.get("name", ""),
+            description=spec_dict.get("description", ""),
+            task_type=spec_dict.get("task_type", "function"),
+            inputs=spec_dict.get("inputs", []),
+            outputs=spec_dict.get("outputs", []),
+            preconditions=spec_dict.get("preconditions", []),
+            postconditions=spec_dict.get("postconditions", []),
+            test_cases=spec_dict.get("test_cases", [])
+        )
+        
+        return CLIResult(
+            success=True,
+            message="Specification generated from description",
             data={"specification": task_spec}
         )
 
@@ -312,14 +464,14 @@ class RunCommand:
     def _determine_output_dir(
         self,
         specified_dir: Optional[Path],
-        spec_path: Path
+        spec_path: Optional[Path]
     ) -> Optional[Path]:
         """
-        Determine output directory.
+        Determine output directory for generated code.
 
         Args:
-            specified_dir: User-specified directory
-            spec_path: Path to specification file
+            specified_dir: User-specified output directory
+            spec_path: Path to specification file (None for natural language input)
 
         Returns:
             Output directory path or None if failed
@@ -327,8 +479,12 @@ class RunCommand:
         if specified_dir is not None:
             return PathValidator.ensure_directory(specified_dir)
 
-        # Use default: output directory next to spec file
-        default_dir = spec_path.parent / "output"
+        # Use default: output directory next to spec file or current directory
+        if spec_path is not None:
+            default_dir = spec_path.parent / "output"
+        else:
+            # For natural language input, use current directory
+            default_dir = Path.cwd() / "output"
         return PathValidator.ensure_directory(default_dir)
 
     def _determine_layers(
@@ -399,19 +555,127 @@ class RunCommand:
         # 6. Generate final code
         # 7. Save to output directory
 
-        # For now, provide simulation that demonstrates the interface
-        result = self._simulate_execution(
-            task_spec,
-            layers,
-            num_agents,
-            output_dir,
-            verbose
+        # Initialize real execution stack
+        
+        # 1. Setup Model Pool (using Ollama)
+        # In a real scenario, we would load this from config
+        pool_config = ModelPoolConfig(
+            model_name="ollama/codellama:7b-instruct-q4_K_M", # Default to codellama via Ollama
+            max_concurrent_requests=num_agents,
+            warmup_on_start=False # Don't preload for Ollama
         )
+        
+        # Initialize model pool - validate config first
+        if not pool_config.validate():
+            return ExecutionResult(
+                task_id=task_spec.task_id,
+                success=False,
+                errors=["Invalid model pool configuration"]
+            )
+        
+        model_pool = ModelPool(pool_config)
+        if model_pool is None:
+            return ExecutionResult(
+                task_id=task_spec.task_id,
+                success=False,
+                errors=["Failed to initialize model pool"]
+            )
+        llm_pool_adapter = self.LLMPoolAdapter(model_pool)
 
+        # 2. Setup Swarm Coordinator
+        swarm_config = SwarmConfig(
+            max_concurrent_tasks=5,
+            agents_per_task=num_agents,
+            enable_voting=True
+        )
+        
+        coordinator = SwarmCoordinator(llm_pool_adapter, swarm_config)
+        
+        # 3. Convert CLI TaskSpec to Core TaskSpec
+        # The CLI uses a simplified local TaskSpecification class, but the core system
+        # expects the full src.core.task_spec.language.TaskSpecification
+        
+        # Convert CLI TaskSpec to Core TaskSpec - validate task type
+        # Check if task_type is a valid TaskType enum value
+        core_task_type = None
+        for task_type_member in TaskType:
+            if task_type_member.value == task_spec.task_type:
+                core_task_type = task_type_member
+                break
+        
+        if core_task_type is None:
+            core_task_type = TaskType.CODE_GENERATION  # Default
+            
+        core_task = CoreTaskSpecification(
+            id=task_spec.task_id,
+            name=task_spec.name,
+            description=task_spec.description,
+            task_type=core_task_type,
+            # Map other fields as needed
+            max_lines=50, # Default
+            max_complexity=10
+        )
+        
+        # 4. Submit and Execute
+        self.formatter.print_info("Submitting task to swarm...")
+        if not coordinator.submit_task(core_task):
+             return ExecutionResult(
+                task_id=task_spec.task_id,
+                success=False,
+                errors=["Failed to submit task to swarm"]
+            )
+            
+        self.formatter.print_info("Executing task swarm...")
+        
+        # Create base agent config
+        agent_config = AgentConfig(
+            model_name="ollama/llama3",
+            temperature=0.7,
+            system_prompt="You are an expert python programmer.",
+            diversity_index=0
+        )
+        
+        aggregated_result = coordinator.execute_task(core_task, agent_config)
+        
         end_time = datetime.now()
-        result.execution_time_ms = (end_time - start_time).total_seconds() * 1000
-
-        return result
+        execution_time_ms = (end_time - start_time).total_seconds() * 1000
+        
+        if aggregated_result and aggregated_result.consensus_achieved:
+            # Save output - validate output directory exists
+            if not output_dir.exists():
+                output_dir.mkdir(parents=True, exist_ok=True)
+            
+            output_file = output_dir / f"{task_spec.name.lower().replace(' ', '_')}.py"
+            code_content = str(aggregated_result.winning_result)
+            
+            # Write file
+            output_file.write_text(code_content)
+            if not output_file.exists():
+                return ExecutionResult(
+                    task_id=task_spec.task_id,
+                    success=False,
+                    errors=["Failed to write output file"]
+                )
+                
+            return ExecutionResult(
+                task_id=task_spec.task_id,
+                success=True,
+                output_files=[str(output_file)],
+                verification_passed=True,
+                agents_used=aggregated_result.total_agents,
+                layers_executed=layers,
+                execution_time_ms=execution_time_ms,
+                metadata={
+                    "confidence": aggregated_result.confidence_score
+                }
+            )
+        else:
+            return ExecutionResult(
+                task_id=task_spec.task_id,
+                success=False,
+                errors=["Swarm failed to reach consensus or execute task"],
+                execution_time_ms=execution_time_ms
+            )
 
     def _simulate_execution(
         self,
@@ -448,10 +712,12 @@ class RunCommand:
         # Generate simple code based on spec
         code_content = self._generate_sample_code(task_spec)
 
-        # Write output file
-        try:
-            output_file.write_text(code_content)
-        except OSError:
+        # Write output file - validate directory exists first
+        if not output_file.parent.exists():
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        output_file.write_text(code_content)
+        if not output_file.exists():
             return ExecutionResult(
                 task_id=task_spec.task_id,
                 success=False,

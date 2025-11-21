@@ -83,43 +83,40 @@ Usage:
     vram_mgr.monitor_memory()
 """
 
-from llm.optimization.batching import (
+from .batching import (
     BatchStrategy,
     BatchConfig,
+    BatchProcessor,
     BatchRequest,
     Batch,
-    BatchStatistics,
-    BatchProcessor,
+    BatchStatistics
 )
 
-from llm.optimization.caching import (
-    CacheStrategy,
-    CacheBackend,
-    CacheConfig,
-    CacheEntry,
-    CacheStatistics,
+from .caching import (
     ResponseCache,
+    CacheEntry,
+    CacheStrategy
 )
 
-from llm.optimization.load_balancer import (
+from .load_balancer import (
+    LoadBalancer,
     LoadBalancingStrategy,
     PoolHealth,
     LoadBalancerConfig,
     PoolConfig,
     PoolMetrics,
-    LoadBalancerStatistics,
-    LoadBalancer,
+    LoadBalancerStatistics
 )
 
-from llm.optimization.vram_manager import (
-    MemoryStatus,
-    AllocationStrategy,
+from .vram_manager import (
     VRAMConfig,
     DeviceInfo,
     MemoryAllocation,
     DeviceMemoryState,
     VRAMStatistics,
     VRAMManager,
+    MemoryStatus,
+    AllocationStrategy
 )
 
 

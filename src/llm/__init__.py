@@ -284,20 +284,20 @@ Total Lines of Code: ~25,000+ lines of production-ready Python
 """
 
 # Import all submodules for easy access
-from llm import models
-from llm import prompts
-from llm import error_handling
-from llm import optimization
+from . import models
+from . import prompts
+from . import error_handling
+from . import optimization
 
 # Re-export commonly used classes
-from llm.models import (
+from .models import (
     ModelLoader,
     ModelPool,
     InferenceEngine,
     QuantizationType,
 )
 
-from llm.prompts import (
+from .prompts import (
     get_prompt,
     list_prompts,
     get_prompt_statistics,
@@ -314,14 +314,14 @@ from llm.prompts import (
     NUMERICAL_COMPUTING_PROMPT,
 )
 
-from llm.error_handling import (
+from .error_handling import (
     CUDAHandler,
     FallbackManager,
     RetryHandler,
     TimeoutHandler,
 )
 
-from llm.optimization import (
+from .optimization import (
     BatchProcessor,
     ResponseCache,
     LoadBalancer,

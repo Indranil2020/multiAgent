@@ -278,12 +278,13 @@ class CLIApplication:
         Returns:
             Option value or None
         """
-        try:
-            idx = args.index(option)
-            if idx + 1 < len(args):
-                return args[idx + 1]
-        except ValueError:
-            pass
+        # Check if option exists in args
+        if option not in args:
+            return None
+        
+        idx = args.index(option)
+        if idx + 1 < len(args):
+            return args[idx + 1]
         return None
 
     def _show_help(self) -> None:

@@ -14,37 +14,31 @@ Available Archetypes:
 - ReviewerAgent: Code review
 - DocumenterAgent: Documentation generation
 - OptimizerAgent: Code optimization
+- SpecificationAgent: Specification generation
 """
 
-from .base_agent import (
-    BaseAgent,
-    AgentExecutionContext,
-    AgentExecutionResult,
-    LLMPool
-)
-from .decomposer_agent import DecomposerAgent
-from .architect_agent import ArchitectAgent
+from .base_agent import BaseAgent, AgentExecutionContext, AgentExecutionResult
 from .coder_agent import CoderAgent
+from .decomposer_agent import DecomposerAgent
 from .verifier_agent import VerifierAgent
 from .tester_agent import TesterAgent
 from .reviewer_agent import ReviewerAgent
-from .documenter_agent import DocumenterAgent
 from .optimizer_agent import OptimizerAgent
+from .documenter_agent import DocumenterAgent
+from .architect_agent import ArchitectAgent
+from .specification_agent import SpecificationAgent
 
 __all__ = [
-    # Base
     'BaseAgent',
     'AgentExecutionContext',
     'AgentExecutionResult',
-    'LLMPool',
-
-    # Archetypes
-    'DecomposerAgent',
-    'ArchitectAgent',
     'CoderAgent',
+    'DecomposerAgent',
     'VerifierAgent',
     'TesterAgent',
     'ReviewerAgent',
-    'DocumenterAgent',
     'OptimizerAgent',
+    'DocumenterAgent',
+    'ArchitectAgent',
+    'SpecificationAgent',
 ]

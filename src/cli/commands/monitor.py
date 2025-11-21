@@ -216,30 +216,25 @@ class MonitorCommand:
         self.formatter.print_info("Press Ctrl+C to stop")
         print()
 
-        try:
-            while True:
-                # Fetch metrics
-                metrics = self._fetch_metrics(options.api_url)
-                health = self._fetch_health(options.api_url)
-                agents = self._fetch_agent_status(options.api_url)
-                tasks = self._fetch_task_status(options.api_url)
+        # Continuous monitoring loop - user can stop with Ctrl+C
+        while True:
+            # Fetch metrics
+            metrics = self._fetch_metrics(options.api_url)
+            health = self._fetch_health(options.api_url)
+            agents = self._fetch_agent_status(options.api_url)
+            tasks = self._fetch_task_status(options.api_url)
 
-                # Clear screen (simplified - in production would use proper terminal control)
-                print("\033[2J\033[H", end="")
+            # Clear screen (simplified - in production would use proper terminal control)
+            print("\033[2J\033[H", end="")
 
-                # Display
-                if options.format_type == "json":
-                    self._display_json(metrics, health, agents, tasks)
-                else:
-                    self._display_text(metrics, health, agents, tasks)
+            # Display
+            if options.format_type == "json":
+                self._display_json(metrics, health, agents, tasks)
+            else:
+                self._display_text(metrics, health, agents, tasks)
 
-                # Wait for next update
-                time.sleep(options.interval)
-
-        except KeyboardInterrupt:
-            print("\n")
-            self.formatter.print_info("Monitoring stopped")
-            return CLIResult(success=True, message="Monitoring stopped")
+            # Wait for next update
+            time.sleep(options.interval)
 
     def _fetch_metrics(self, api_url: Optional[str]) -> SystemMetrics:
         """

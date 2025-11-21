@@ -1,0 +1,71 @@
+{
+    "task_id": "complex-task-001",
+    "name": "Fibonacci Calculator with Memoization",
+    "description": "Create a Python function that calculates Fibonacci numbers using memoization for efficiency. The function should handle edge cases and include proper error handling.",
+    "task_type": "function",
+    "inputs": [
+        {
+            "name": "n",
+            "type": "int",
+            "description": "The position in the Fibonacci sequence (0-indexed)"
+        }
+    ],
+    "outputs": [
+        {
+            "name": "result",
+            "type": "int",
+            "description": "The Fibonacci number at position n"
+        }
+    ],
+    "preconditions": [
+        "n >= 0",
+        "n <= 100"
+    ],
+    "postconditions": [
+        "result >= 0",
+        "result is correct Fibonacci number"
+    ],
+    "test_cases": [
+        {
+            "input": {
+                "n": 0
+            },
+            "expected_output": {
+                "result": 0
+            }
+        },
+        {
+            "input": {
+                "n": 1
+            },
+            "expected_output": {
+                "result": 1
+            }
+        },
+        {
+            "input": {
+                "n": 10
+            },
+            "expected_output": {
+                "result": 55
+            }
+        },
+        {
+            "input": {
+                "n": 20
+            },
+            "expected_output": {
+                "result": 6765
+            }
+        }
+    ],
+    "constraints": {
+        "max_complexity": 10,
+        "max_lines": 30,
+        "timeout_ms": 5000
+    },
+    "hints": [
+        "Use a dictionary to store previously calculated values",
+        "Handle base cases n=0 and n=1 explicitly"
+    ]
+}

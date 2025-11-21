@@ -54,7 +54,7 @@ Usage:
     result = timeout_handler.with_timeout(long_operation, timeout=30.0)
 """
 
-from llm.error_handling.cuda_handler import (
+from .cuda_handler import (
     CUDAErrorType,
     RecoveryStrategy,
     CUDAHandlerConfig,
@@ -64,7 +64,7 @@ from llm.error_handling.cuda_handler import (
     CUDAHandler,
 )
 
-from llm.error_handling.fallback_models import (
+from .fallback_models import (
     FallbackStrategy,
     ModelTier,
     FallbackConfig,
@@ -75,7 +75,7 @@ from llm.error_handling.fallback_models import (
     FallbackManager,
 )
 
-from llm.error_handling.retry_handler import (
+from .retry_handler import (
     RetryStrategy,
     ErrorCategory,
     RetryConfig,
@@ -85,7 +85,7 @@ from llm.error_handling.retry_handler import (
     RetryHandler,
 )
 
-from llm.error_handling.timeout_handler import (
+from .timeout_handler import (
     TimeoutType,
     TimeoutAction,
     TimeoutConfig,

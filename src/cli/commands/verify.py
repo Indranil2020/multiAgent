@@ -262,15 +262,33 @@ class VerifyCommand:
         total_errors = 0
         total_warnings = 0
 
-        # Read code file
-        try:
-            code_content = code_path.read_text()
-        except (OSError, UnicodeDecodeError):
-            # Return failed report
+        # Read code file - validate path first
+        if not code_path.exists() or not code_path.is_file():
             error_result = LayerResult(
                 layer_name="file_read",
                 passed=False,
-                errors=["Failed to read code file"],
+                errors=["Code file does not exist or is not a file"],
+                execution_time_ms=0.0
+            )
+            return VerificationReport(
+                code_path=str(code_path),
+                timestamp=start_time.isoformat(),
+                overall_passed=False,
+                layers_run=0,
+                layers_passed=0,
+                layers_failed=1,
+                layer_results=[error_result],
+                total_errors=1,
+                total_warnings=0,
+                total_time_ms=0.0
+            )
+        
+        code_content = code_path.read_text()
+        if not code_content:
+            error_result = LayerResult(
+                layer_name="file_read",
+                passed=False,
+                errors=["Failed to read code file or file is empty"],
                 execution_time_ms=0.0
             )
             return VerificationReport(
@@ -381,20 +399,21 @@ class VerifyCommand:
         Returns:
             LayerResult
         """
-        # Basic syntax check
+        # Basic syntax check - compile validates syntax
         if layer_name == "syntax":
-            try:
-                compile(code_content, str(code_path), 'exec')
+            # Use compile() which returns None on success or raises SyntaxError
+            compiled = compile(code_content, str(code_path), 'exec')
+            if compiled is not None:
                 return LayerResult(
                     layer_name=layer_name,
                     passed=True,
                     metadata={"lines": len(code_content.splitlines())}
                 )
-            except SyntaxError as e:
+            else:
                 return LayerResult(
                     layer_name=layer_name,
                     passed=False,
-                    errors=[f"Syntax error at line {e.lineno}: {e.msg}"]
+                    errors=["Syntax validation failed"]
                 )
 
         # Type checking placeholder
@@ -571,10 +590,21 @@ class VerifyCommand:
             ]
         }
 
-        # Write to file
-        try:
-            output_path.write_text(json.dumps(report_dict, indent=2))
-        except (OSError, TypeError):
+        # Write to file - validate data is serializable
+        json_str = json.dumps(report_dict, indent=2)
+        if not json_str:
+            return CLIResult(
+                success=False,
+                message=f"Failed to serialize report",
+                error_code=50
+            )
+        
+        # Ensure output directory exists
+        if not output_path.parent.exists():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        output_path.write_text(json_str)
+        if not output_path.exists():
             return CLIResult(
                 success=False,
                 message=f"Failed to save report to {output_path}",

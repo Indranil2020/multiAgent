@@ -29,10 +29,10 @@ Usage:
 
 from typing import Dict, List, Optional
 
-from llm.prompts.base_prompts import PromptTemplate
+from ..base_prompts import PromptTemplate
 
 # Import all domain-specific template dictionaries
-from llm.prompts.domain_prompts.web_prompts import (
+from .web_prompts import (
     ALL_WEB_TEMPLATES,
     REACT_COMPONENT_PROMPT,
     REST_API_PROMPT,
@@ -43,7 +43,7 @@ from llm.prompts.domain_prompts.web_prompts import (
     list_web_templates
 )
 
-from llm.prompts.domain_prompts.db_prompts import (
+from .db_prompts import (
     ALL_DB_TEMPLATES,
     SQL_QUERY_OPTIMIZATION_PROMPT,
     ORM_MODEL_DESIGN_PROMPT,
@@ -54,7 +54,7 @@ from llm.prompts.domain_prompts.db_prompts import (
     list_db_templates
 )
 
-from llm.prompts.domain_prompts.game_prompts import (
+from .game_prompts import (
     ALL_GAME_TEMPLATES,
     GAME_LOOP_PROMPT,
     ECS_PROMPT,
@@ -64,7 +64,7 @@ from llm.prompts.domain_prompts.game_prompts import (
     list_game_templates
 )
 
-from llm.prompts.domain_prompts.os_prompts import (
+from .os_prompts import (
     ALL_OS_TEMPLATES,
     PROCESS_MANAGEMENT_PROMPT,
     FILE_IO_PROMPT,
@@ -74,7 +74,7 @@ from llm.prompts.domain_prompts.os_prompts import (
     list_os_templates
 )
 
-from llm.prompts.domain_prompts.scientific_prompts import (
+from .scientific_prompts import (
     ALL_SCIENTIFIC_TEMPLATES,
     NUMERICAL_COMPUTING_PROMPT,
     SCIENTIFIC_SIMULATION_PROMPT,

@@ -1,0 +1,11 @@
+{
+    "id": "test-task-001",
+    "name": "Hello World Function",
+    "description": "Create a python function that prints 'Hello, World!'",
+    "task_type": "function",
+    "inputs": [],
+    "outputs": [{"name": "result", "type": "None"}],
+    "preconditions": [],
+    "postconditions": [],
+    "test_cases": []
+}

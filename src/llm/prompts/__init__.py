@@ -89,13 +89,12 @@ Usage:
 from typing import Dict, List, Optional
 
 # Import base classes and enums
-from llm.prompts.base_prompts import (
-    PromptTemplate,
-    PromptFormat,
+from .base_prompts import (
+    PromptTemplate
 )
 
 # Import all base templates
-from llm.prompts.base_prompts import (
+from .base_prompts import (
     ALL_BASE_TEMPLATES,
     ZERO_ERROR_SYSTEM_PROMPT,
     TASK_SPECIFICATION_PROMPT,
@@ -112,24 +111,19 @@ from llm.prompts.base_prompts import (
 )
 
 # Import all coding templates
-from llm.prompts.coding_prompts import (
+from .coding_prompts import (
     ALL_CODING_TEMPLATES,
     FUNCTION_IMPLEMENTATION_PROMPT,
     CLASS_IMPLEMENTATION_PROMPT,
-    ALGORITHM_IMPLEMENTATION_PROMPT,
     API_ENDPOINT_PROMPT,
-    DATABASE_MODEL_PROMPT,
-    ERROR_HANDLING_PROMPT,
+    ALGORITHM_IMPLEMENTATION_PROMPT,
     REFACTORING_PROMPT,
-    DATA_STRUCTURE_PROMPT,
-    ASYNC_IMPLEMENTATION_PROMPT,
-    PERFORMANCE_OPTIMIZATION_PROMPT,
     get_coding_template,
     list_coding_templates,
 )
 
 # Import all verification templates
-from llm.prompts.verification_prompts import (
+from .verification_prompts import (
     ALL_VERIFICATION_TEMPLATES,
     SYNTAX_VERIFICATION_PROMPT,
     TYPE_CHECKING_PROMPT,
@@ -145,7 +139,7 @@ from llm.prompts.verification_prompts import (
 )
 
 # Import all review templates
-from llm.prompts.review_prompts import (
+from .review_prompts import (
     ALL_REVIEW_TEMPLATES,
     CODE_REVIEW_QUALITY_PROMPT,
     BEST_PRACTICES_REVIEW_PROMPT,
@@ -162,7 +156,7 @@ from llm.prompts.review_prompts import (
 )
 
 # Import all domain templates
-from llm.prompts.domain_prompts import (
+from .domain_prompts import (
     ALL_DOMAIN_TEMPLATES,
     # Web
     ALL_WEB_TEMPLATES,

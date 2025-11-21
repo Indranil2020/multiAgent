@@ -31,6 +31,7 @@ class ModelBackend(Enum):
     TRANSFORMERS = "transformers"
     LLAMA_CPP = "llama_cpp"
     VLLM = "vllm"
+    OLLAMA = "ollama"
     CUSTOM = "custom"
 
 
@@ -170,6 +171,8 @@ class ModelLoader:
             loaded_model = self._load_llama_cpp_model(config)
         elif config.backend == ModelBackend.VLLM:
             loaded_model = self._load_vllm_model(config)
+        elif config.backend == ModelBackend.OLLAMA:
+            loaded_model = self._load_ollama_model(config)
         else:
             # Custom or unsupported backend
             return None
@@ -284,6 +287,33 @@ class ModelLoader:
             vram_usage_gb=vram_usage,
             backend=ModelBackend.VLLM,
             is_quantized=False
+        )
+
+    def _load_ollama_model(
+        self,
+        config: ModelLoadConfig
+    ) -> Optional[LoadedModel]:
+        """
+        Load model using Ollama.
+
+        Args:
+            config: Model loading configuration
+
+        Returns:
+            LoadedModel if successful, None if failed
+        """
+        # In production, we might want to check if ollama is running
+        # For now, we assume it is and return a placeholder model object
+        # The actual inference will be handled by the InferenceEngine calling ollama API
+
+        return LoadedModel(
+            model={"backend": "ollama", "name": config.model_name_or_path},  # Pass model info
+            tokenizer=None,  # Ollama handles tokenization
+            config={"model_name": config.model_name_or_path},
+            device="cpu",  # Ollama manages device
+            vram_usage_gb=0.0,  # Managed by Ollama
+            backend=ModelBackend.OLLAMA,
+            is_quantized=True  # Usually quantized
         )
 
     def _determine_device(self, device_type: DeviceType) -> str:
@@ -424,9 +454,16 @@ def create_default_load_config(
     if use_quantization:
         quant_config = create_quantization_config_4bit()
 
+    backend = ModelBackend.TRANSFORMERS
+    real_model_name = model_name
+    
+    if model_name.startswith("ollama/"):
+        backend = ModelBackend.OLLAMA
+        real_model_name = model_name.replace("ollama/", "")
+
     return ModelLoadConfig(
-        model_name_or_path=model_name,
-        backend=ModelBackend.TRANSFORMERS,
+        model_name_or_path=real_model_name,
+        backend=backend,
         device=DeviceType.AUTO,
         quantization_config=quant_config,
         trust_remote_code=False,
